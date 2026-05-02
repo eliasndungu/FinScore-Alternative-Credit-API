@@ -1,0 +1,95 @@
+version: "3.9"
+
+# ---------------------------------------------------------------------------
+# FinScore Alternative Credit Scoring API
+#
+# Services
+# --------
+# api       – Go REST gateway (OAuth2 + /v1/score endpoint)
+# scorer    – Python FastAPI + XGBoost gRPC microservice
+# logstash  – Logstash pipeline (parses JSON logs from api & scorer)
+# elasticsearch – Elasticsearch for log storage
+# kibana    – Kibana dashboard for ODPC audit-trail visualisation
+# ---------------------------------------------------------------------------
+
+services:
+
+  # --------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8080:8080"
+    environment:
+      APP_ENV: production
+      JWT_SECRET: ${JWT_SECRET:-super-secret-change-me}
+      OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-finscore-demo}
+      OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET:-change-me}
+      SCORER_ADDR: scorer:50051
+      GRPC_TIMEOUT: 10s
+      HTTP_ADDR: ":8080"
+    depends_on:
+      scorer:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  scorer:
+    build:
+      context: ./python-scorer
+      dockerfile: Dockerfile
+    ports:
+      - "50051:50051"
+      - "8000:8000"
+    environment:
+      GRPC_PORT: "50051"
+      HTTP_PORT: "8000"
+      LOG_LEVEL: INFO
+      # MODEL_PATH: /models/model.ubj  # uncomment to load a persisted model
+    volumes:
+      - ./models:/models:ro
+    healthcheck:
+      test: ["CMD", "python3", "-c",
+             "import grpc; ch=grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=5)"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.0
+    volumes:
+      - ./elk/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.0
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+volumes:
+  esdata:

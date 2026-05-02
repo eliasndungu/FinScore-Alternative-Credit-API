@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package scoring;
+
+option go_package = "github.com/eliasndungu/finscore/proto/scoring";
+
+// ScoringService exposes the XGBoost-backed credit scoring logic.
+service ScoringService {
+  // ComputeScore accepts M-Pesa transaction history and phone metadata,
+  // returning a credit score and risk classification.
+  rpc ComputeScore(ScoreRequest) returns (ScoreResponse);
+}
+
+// MpesaTransaction represents a single M-Pesa transaction record.
+message MpesaTransaction {
+  string transaction_id = 1;
+  // type is one of: SEND_MONEY, RECEIVE_MONEY, BUY_AIRTIME, PAY_BILL,
+  // BUY_GOODS, WITHDRAW, DEPOSIT, FULIZA
+  string type        = 2;
+  double amount      = 3;
+  // timestamp in RFC-3339 / ISO-8601 format, e.g. "2024-01-15T10:30:00Z"
+  string timestamp   = 4;
+  // counterparty phone number or business short-code (may be empty)
+  string counterparty = 5;
+}
+
+// PhoneMetadata carries subscriber-level signals.
+message PhoneMetadata {
+  // msisdn is the Safaricom number in E.164 format, e.g. "+254712345678"
+  string msisdn            = 1;
+  int32  account_age_days  = 2;
+  // network_provider e.g. "Safaricom", "Airtel", "Telkom"
+  string network_provider  = 3;
+}
+
+// ScoreRequest is the payload sent by the Go API to the Python scorer.
+message ScoreRequest {
+  repeated MpesaTransaction transactions = 1;
+  PhoneMetadata             phone_metadata = 2;
+}
+
+// ScoreResponse is returned by the Python scorer to the Go API.
+message ScoreResponse {
+  // score is a probability in [0, 1] where higher = more creditworthy.
+  double score       = 1;
+  // risk_band is one of: LOW, MEDIUM, HIGH, VERY_HIGH
+  string risk_band   = 2;
+  // explanation is a human-readable summary of the key scoring factors.
+  string explanation = 3;
+}

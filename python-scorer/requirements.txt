@@ -1,0 +1,8 @@
+# FinScore Python Scorer – runtime dependencies
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+grpcio==1.80.0
+grpcio-tools==1.80.0
+protobuf==6.33.6
+xgboost==3.0.2
+numpy==2.2.5

@@ -1,0 +1,42 @@
+# Binaries / build artefacts
+bin/
+*.exe
+*.test
+*.out
+
+# Go module cache (not committed)
+vendor/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Environment / secrets (NEVER commit these)
+.env
+.env.*
+*.pem
+*.key
+*.crt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker volumes / local data
+models/
+esdata/
+
+# macOS
+.DS_Store
+
+# Temporary files
+tmp/
